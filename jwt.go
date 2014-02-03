@@ -81,58 +81,58 @@ func (t *Token) SigningString() (string, error) {
 // If everything is kosher, err will be nil
 func Parse(tokenString string, keyFunc Keyfunc) (token *Token, err error) {
 	parts := strings.Split(tokenString, ".")
-	if len(parts) == 3 {
-		token = &Token{Raw: tokenString}
-		// parse Header
-		var headerBytes []byte
-		if headerBytes, err = DecodeSegment(parts[0]); err != nil {
-			return
-		}
-		if err = json.Unmarshal(headerBytes, &token.Header); err != nil {
-			return
-		}
-
-		// parse Claims
-		var claimBytes []byte
-		if claimBytes, err = DecodeSegment(parts[1]); err != nil {
-			return
-		}
-		if err = json.Unmarshal(claimBytes, &token.Claims); err != nil {
-			return
-		}
-
-		// Lookup signature method
-		if method, ok := token.Header["alg"].(string); ok {
-			if token.Method = GetSigningMethod(method); token.Method == nil {
-				err = errors.New("Signing method (alg) is unavailable.")
-				return
-			}
-		} else {
-			err = errors.New("Signing method (alg) is unspecified.")
-			return
-		}
-
-		// Check expiry times
-		if exp, ok := token.Claims["exp"].(float64); ok {
-			if time.Now().Unix() > int64(exp) {
-				err = errors.New("Token is expired")
-			}
-		}
-
-		// Lookup key
-		var key []byte
-		if key, err = keyFunc(token); err != nil {
-			return
-		}
-
-		// Perform validation
-		if err = token.Method.Verify(strings.Join(parts[0:2], "."), parts[2], key); err == nil {
-			token.Valid = true
-		}
-
-	} else {
-		err = errors.New("Token contains an invalid number of segments")
+	if len(parts) != 3 {
+		return nil, errors.New("Token contains an invalid number of segments")
 	}
+
+	token = &Token{Raw: tokenString}
+	// parse Header
+	var headerBytes []byte
+	if headerBytes, err = DecodeSegment(parts[0]); err != nil {
+		return
+	}
+	if err = json.Unmarshal(headerBytes, &token.Header); err != nil {
+		return
+	}
+
+	// parse Claims
+	var claimBytes []byte
+	if claimBytes, err = DecodeSegment(parts[1]); err != nil {
+		return
+	}
+	if err = json.Unmarshal(claimBytes, &token.Claims); err != nil {
+		return
+	}
+
+	// Lookup signature method
+	if method, ok := token.Header["alg"].(string); ok {
+		if token.Method = GetSigningMethod(method); token.Method == nil {
+			err = errors.New("Signing method (alg) is unavailable.")
+			return
+		}
+	} else {
+		err = errors.New("Signing method (alg) is unspecified.")
+		return
+	}
+
+	// Check expiry times
+	if exp, ok := token.Claims["exp"].(float64); ok {
+		if time.Now().Unix() > int64(exp) {
+			err = errors.New("Token is expired")
+		}
+	}
+
+	// Lookup key
+	var key []byte
+	if key, err = keyFunc(token); err != nil {
+		return
+	}
+
+	// Perform validation
+	if err = token.Method.Verify(strings.Join(parts[0:2], "."), parts[2], key); err == nil {
+		token.Valid = true
+	}
+
 	return
 }
 
